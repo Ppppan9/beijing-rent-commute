@@ -1,47 +1,70 @@
-import { useEffect, useMemo } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   MapContainer,
   TileLayer,
   Marker,
   Popup,
   Polyline,
-  CircleMarker,
   useMapEvents,
   useMap,
 } from 'react-leaflet'
 import L from 'leaflet'
 import type { CompanyLocation, CommuteInfo, RentalListing } from '../types'
 
-// Fix default marker icons under Vite/bundlers
-const DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-})
-L.Marker.prototype.options.icon = DefaultIcon
+type BasemapId = 'voyager' | 'positron'
+
+const BASEMAPS: Record<
+  BasemapId,
+  { name: string; url: string; attribution: string; maxZoom: number }
+> = {
+  voyager: {
+    name: 'Voyager',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxZoom: 20,
+  },
+  positron: {
+    name: 'Positron',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxZoom: 20,
+  },
+}
 
 function companyIcon() {
   return L.divIcon({
-    className: 'custom-pin',
-    html: `<div style="background:#2563eb;color:#fff;width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);font-size:14px;font-weight:700">司</span></div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -28],
+    className: 'map-marker-wrap',
+    html: `
+      <div class="map-marker company-marker">
+        <span class="map-marker-pulse"></span>
+        <span class="map-marker-core">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>
+        </span>
+        <span class="map-marker-label">公司</span>
+      </div>
+    `,
+    iconSize: [56, 56],
+    iconAnchor: [28, 48],
+    popupAnchor: [0, -44],
   })
 }
 
-function rentalIcon(color: string, rank?: number) {
+function rentalIcon(color: string, rank?: number, selected?: boolean) {
   const label = rank != null ? String(rank) : '房'
   return L.divIcon({
-    className: 'custom-pin',
-    html: `<div style="background:${color};color:#fff;width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);font-size:12px;font-weight:700">${label}</span></div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 30],
-    popupAnchor: [0, -26],
+    className: `map-marker-wrap ${selected ? 'is-selected' : ''}`,
+    html: `
+      <div class="map-marker rental-marker ${selected ? 'is-selected' : ''}" style="--pin:${color}">
+        <span class="map-marker-core">${label}</span>
+        <span class="map-marker-stem"></span>
+        <span class="map-marker-shadow"></span>
+      </div>
+    `,
+    iconSize: [40, 52],
+    iconAnchor: [20, 48],
+    popupAnchor: [0, -42],
   })
 }
 
@@ -65,7 +88,7 @@ function FitBounds({
       map.setView(pts[0], 13)
       return
     }
-    map.fitBounds(L.latLngBounds(pts), { padding: [48, 48], maxZoom: 14 })
+    map.fitBounds(L.latLngBounds(pts), { padding: [56, 56], maxZoom: 14 })
   }, [company, listings, map])
   return null
 }
@@ -82,6 +105,19 @@ function ClickHandler({
       if (enabled) onPick(e.latlng.lat, e.latlng.lng)
     },
   })
+  return null
+}
+
+/** Soften Leaflet chrome to match modern basemap */
+function MapChrome() {
+  const map = useMap()
+  useEffect(() => {
+    const el = map.getContainer()
+    el.classList.add('map-modern')
+    return () => {
+      el.classList.remove('map-modern')
+    }
+  }, [map])
   return null
 }
 
@@ -108,6 +144,16 @@ export default function MapView({
   onMapPick,
   onSelectListing,
 }: Props) {
+  const [basemap, setBasemap] = useState<BasemapId>(() => {
+    try {
+      const saved = localStorage.getItem('bj-rent-basemap') as BasemapId | null
+      if (saved === 'voyager' || saved === 'positron') return saved
+    } catch {
+      /* ignore */
+    }
+    return 'voyager'
+  })
+
   const center = useMemo<[number, number]>(
     () =>
       company
@@ -116,49 +162,60 @@ export default function MapView({
     [company],
   )
 
+  const tile = BASEMAPS[basemap]
+
+  const setBasemapPersist = (id: BasemapId) => {
+    setBasemap(id)
+    try {
+      localStorage.setItem('bj-rent-basemap', id)
+    } catch {
+      /* ignore */
+    }
+  }
+
   return (
     <div className={`map-wrap ${pinMode ? 'pin-mode' : ''}`}>
       {pinMode && (
         <div className="pin-banner">
-          点击地图放置{pinMode === 'company' ? '公司' : '房源'}位置（可拖动微调请重新点选）
+          点击地图放置{pinMode === 'company' ? '公司' : '房源'}位置
         </div>
       )}
-      <MapContainer center={center} zoom={11} className="map-root" scrollWheelZoom>
+
+      <div className="basemap-switch" role="group" aria-label="底图样式">
+        <button
+          type="button"
+          className={basemap === 'voyager' ? 'active' : ''}
+          onClick={() => setBasemapPersist('voyager')}
+        >
+          Voyager
+        </button>
+        <button
+          type="button"
+          className={basemap === 'positron' ? 'active' : ''}
+          onClick={() => setBasemapPersist('positron')}
+        >
+          Positron
+        </button>
+      </div>
+
+      <MapContainer
+        center={center}
+        zoom={11}
+        className="map-root"
+        scrollWheelZoom
+        zoomControl={false}
+      >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          key={basemap}
+          attribution={tile.attribution}
+          url={tile.url}
+          maxZoom={tile.maxZoom}
+          subdomains="abcd"
         />
+        <ZoomControlModern />
+        <MapChrome />
         <FitBounds company={company} listings={listings} />
         <ClickHandler enabled={!!pinMode} onPick={onMapPick} />
-
-        {company && (
-          <Marker position={[company.position.lat, company.position.lng]} icon={companyIcon()}>
-            <Popup>
-              <strong>公司：{company.name}</strong>
-              <br />
-              {company.address}
-            </Popup>
-          </Marker>
-        )}
-
-        {listings.map((l) => (
-          <Marker
-            key={l.id}
-            position={[l.position.lat, l.position.lng]}
-            icon={rentalIcon(l.color, ranks[l.id])}
-            eventHandlers={{ click: () => onSelectListing(l.id) }}
-          >
-            <Popup>
-              <strong>
-                #{ranks[l.id] ?? '-'} {l.name}
-              </strong>
-              <br />
-              {l.address}
-              <br />
-              月租 ¥{l.monthlyRent}
-            </Popup>
-          </Marker>
-        ))}
 
         {company &&
           listings.map((l) => {
@@ -170,29 +227,85 @@ export default function MapView({
                 : info.transit || info.driving
             if (!route?.path?.length) return null
             const active = selectedId === l.id
+            const dimmed = !!selectedId && !active
+            const isTransit = route.mode === 'transit'
             return (
-              <Polyline
-                key={`route-${l.id}-${preferredMode}`}
-                positions={route.path}
-                pathOptions={{
-                  color: l.color,
-                  weight: active ? 5 : 3,
-                  opacity: active ? 0.9 : selectedId ? 0.25 : 0.65,
-                  dashArray: route.mode === 'transit' ? '8 6' : undefined,
-                }}
-                eventHandlers={{ click: () => onSelectListing(l.id) }}
-              />
+              <Fragment key={`route-group-${l.id}-${preferredMode}`}>
+                <Polyline
+                  positions={route.path}
+                  pathOptions={{
+                    color: '#ffffff',
+                    weight: active ? 10 : 7,
+                    opacity: dimmed ? 0.15 : active ? 0.95 : 0.7,
+                    lineCap: 'round',
+                    lineJoin: 'round',
+                    interactive: false,
+                  }}
+                />
+                <Polyline
+                  positions={route.path}
+                  pathOptions={{
+                    color: l.color,
+                    weight: active ? 5 : 3.5,
+                    opacity: dimmed ? 0.2 : active ? 0.95 : 0.75,
+                    lineCap: 'round',
+                    lineJoin: 'round',
+                    dashArray: isTransit ? '10 8' : undefined,
+                  }}
+                  eventHandlers={{ click: () => onSelectListing(l.id) }}
+                />
+              </Fragment>
             )
           })}
 
-        {pinMode && (
-          <CircleMarker
-            center={center}
-            radius={0}
-            pathOptions={{ opacity: 0 }}
-          />
+        {company && (
+          <Marker position={[company.position.lat, company.position.lng]} icon={companyIcon()} zIndexOffset={600}>
+            <Popup className="modern-popup">
+              <div className="popup-card">
+                <div className="popup-kicker">公司</div>
+                <strong>{company.name}</strong>
+                <p>{company.address}</p>
+              </div>
+            </Popup>
+          </Marker>
         )}
+
+        {listings.map((l) => {
+          const selected = selectedId === l.id
+          return (
+            <Marker
+              key={l.id}
+              position={[l.position.lat, l.position.lng]}
+              icon={rentalIcon(l.color, ranks[l.id], selected)}
+              zIndexOffset={selected ? 500 : 200}
+              eventHandlers={{ click: () => onSelectListing(l.id) }}
+            >
+              <Popup className="modern-popup">
+                <div className="popup-card">
+                  <div className="popup-kicker" style={{ color: l.color }}>
+                    推荐 #{ranks[l.id] ?? '-'}
+                  </div>
+                  <strong>{l.name}</strong>
+                  <p>{l.address}</p>
+                  <div className="popup-meta">月租 ¥{l.monthlyRent.toLocaleString('zh-CN')}</div>
+                </div>
+              </Popup>
+            </Marker>
+          )
+        })}
       </MapContainer>
     </div>
   )
+}
+
+function ZoomControlModern() {
+  const map = useMap()
+  useEffect(() => {
+    const ctrl = L.control.zoom({ position: 'bottomright' })
+    ctrl.addTo(map)
+    return () => {
+      ctrl.remove()
+    }
+  }, [map])
+  return null
 }

@@ -46,7 +46,7 @@
 ## 技术栈
 
 - Vite + React + TypeScript
-- Leaflet + OpenStreetMap（演示地图）
+- Leaflet + **CARTO Voyager / Positron** 现代底图（可切换；含 OSM+CARTO 署名）
 - 可选：高德 Web 服务 API（地理编码 / 驾车 / 公交）
 - 无后端，数据存 `localStorage`
 
@@ -85,7 +85,7 @@ VITE_AMAP_KEY=你的Web服务Key
 5. 重启 `npm run dev`
 
 > 浏览器直调高德 REST 时，请在控制台按官方要求配置安全密钥 / 域名白名单（GitHub Pages 域名为 `ppppan9.github.io`）。
-> 若未配置 Key，应用自动进入**演示模式**：OSM 底图、北京地标 + Nominatim 搜索、OSRM 驾车与公交估算，UI 与成本逻辑仍完整可用。
+> 若未配置 Key，应用自动进入**演示模式**：CARTO 现代底图、北京地标 + Nominatim 搜索、OSRM 驾车与公交估算，UI 与成本逻辑仍完整可用。
 
 ### GitHub Actions 注入 Key（可选）
 

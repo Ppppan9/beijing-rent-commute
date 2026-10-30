@@ -431,7 +431,7 @@ export default function App() {
       <footer className="app-footer">
         <span>开源 MIT · 数据仅存于本机浏览器 localStorage</span>
         <span>
-          {demoMode ? '演示模式（OSM）' : '高德地图'} · 推荐分相对当前收藏集归一化
+          {demoMode ? '演示模式（CARTO）' : '高德路线 API'} · 推荐分相对当前收藏集归一化
         </span>
       </footer>
     </div>
