@@ -92,7 +92,8 @@ VITE_AMAP_KEY=你的Web服务Key
 | 环境变量 | 高德控制台类型 | 用途 |
 |----------|----------------|------|
 | `VITE_AMAP_KEY` | **Web服务** | POI 搜索、地理编码、驾车/公交路线（当前线上已用） |
-| `VITE_AMAP_JS_KEY` | **Web端(JS API)** | 预留给官方 `AMap.Map` JS 底图；当前底图使用高德公开栅格瓦片，**可不填**也能显示北京地图 |
+| `VITE_AMAP_JS_KEY` | **Web端(JS API)** | 可选。填写后启用官方 `AMap.Map` 矢量底图；不填则 Leaflet + 高德栅格瓦片 |
+| `VITE_AMAP_SECURITY_CODE` | 安全密钥 | 配合 JS API Key，控制台「密钥」页配置 |
 
 申请入口：[高德控制台 - 应用管理](https://console.amap.com/dev/key/app)。请为 Pages 域名 `ppppan9.github.io` 配置白名单。
 

@@ -777,3 +777,7 @@
 .search-dropdown li.map-fallback { color:#2563eb; font-weight:700; border-top:1px solid #e2e8f0; font-size:0.8rem; align-items:center; }
 .map-fallback-link { border:none; background:none; color:#2563eb; font-size:0.72rem; font-weight:600; padding:4px 2px 0; cursor:pointer; }
 .map-fallback-link:hover { text-decoration:underline; }
+
+.amap-js-root { height: 100%; width: 100%; }
+.amap-js .amap-logo, .amap-js .amap-copyright { display: none !important; } /* keep attribution via our UI if needed */
+

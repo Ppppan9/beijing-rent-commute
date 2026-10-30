@@ -9,6 +9,21 @@ export function hasAmapKey(): boolean {
   return !!getAmapKey()
 }
 
+/** Web端(JS API) Key — 官方矢量底图；与 Web服务 Key 不同 */
+export function getAmapJsKey(): string | undefined {
+  const key = import.meta.env.VITE_AMAP_JS_KEY as string | undefined
+  return key && key.trim() && key !== 'your_amap_js_key_here' ? key.trim() : undefined
+}
+
+export function hasAmapJsKey(): boolean {
+  return !!getAmapJsKey()
+}
+
+export function getAmapSecurityCode(): string | undefined {
+  const code = import.meta.env.VITE_AMAP_SECURITY_CODE as string | undefined
+  return code && code.trim() ? code.trim() : undefined
+}
+
 export interface GeoResult {
   name: string
   address: string
@@ -39,6 +54,15 @@ export async function amapInputTips(keywords: string): Promise<GeoResult[]> {
         let loc = parseLoc(tip.location)
         if (!loc && typeof tip.id === 'string' && tip.id) {
           loc = await amapPlaceDetail(tip.id)
+        }
+        if (!loc) {
+          try {
+            const q = `https://restapi.amap.com/v3/place/text?keywords=${encodeURIComponent(tip.name)}&city=北京&citylimit=true&offset=1&key=${key}&extensions=base`
+            const d = await (await fetch(q)).json()
+            const poi = d.pois?.[0]
+            const pl = parseLoc(poi?.location)
+            if (pl) loc = pl
+          } catch { /* ignore */ }
         }
         if (!loc) return null
         const addr = typeof tip.address === 'string' ? tip.address : ''
@@ -87,7 +111,7 @@ export async function amapGeocode(address: string): Promise<GeoResult[]> {
     if (data.status !== '1' || !data.geocodes?.length) return []
     return data.geocodes.map((g: { formatted_address: string; location: string }) => {
       const [lng, lat] = g.location.split(',').map(Number)
-      return { name: g.formatted_address, address: g.formatted_address, lat, lng }
+      return { name: g.formatted_address, address: g.formatted_address, lat, lng, source: 'geocode' }
     })
   } catch (e) {
     console.warn('[高德] geocode 网络错误', e)
@@ -96,11 +120,14 @@ export async function amapGeocode(address: string): Promise<GeoResult[]> {
 }
 
 /** 高德关键词搜索 POI */
-export async function amapSearch(keywords: string): Promise<GeoResult[]> {
+export async function amapSearch(keywords: string, preferResidential = true): Promise<GeoResult[]> {
   const key = getAmapKey()
   if (!key) return []
   try {
-    const url = `https://restapi.amap.com/v3/place/text?keywords=${encodeURIComponent(keywords)}&city=北京&citylimit=true&types=${encodeURIComponent('120000|120300|120302|120303|120200|170000|150000')}&offset=10&key=${key}&extensions=base`
+    const types = preferResidential
+      ? `&types=${encodeURIComponent('120000|120300|120302|120303|120200|170000|190000|150000')}`
+      : ''
+    const url = `https://restapi.amap.com/v3/place/text?keywords=${encodeURIComponent(keywords)}&city=北京&citylimit=true${types}&offset=12&key=${key}&extensions=base`
     const res = await fetch(url)
     const data = await res.json()
     warnAmap('place/text', data)

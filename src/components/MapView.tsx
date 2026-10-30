@@ -1,3 +1,5 @@
+import AmapJsMap from './AmapJsMap'
+import { canUseAmapJsMap } from '../services/amapJsLoader'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   MapContainer,
@@ -152,7 +154,14 @@ interface Props {
   onSelectListing: (id: string) => void
 }
 
-export default function MapView({
+export default function MapView(props: Props) {
+  if (canUseAmapJsMap()) {
+    return <AmapJsMap {...props} />
+  }
+  return <LeafletGaodeMap {...props} />
+}
+
+function LeafletGaodeMap({
   company,
   listings,
   commuteMap,

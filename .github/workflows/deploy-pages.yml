@@ -29,6 +29,8 @@ jobs:
           npm run build
         env:
           VITE_AMAP_KEY: ${{ secrets.VITE_AMAP_KEY }}
+          VITE_AMAP_JS_KEY: ${{ secrets.VITE_AMAP_JS_KEY }}
+          VITE_AMAP_SECURITY_CODE: ${{ secrets.VITE_AMAP_SECURITY_CODE }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
