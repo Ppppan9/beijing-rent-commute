@@ -39,8 +39,17 @@ export function canUseAmapJsMap(): boolean {
   return hasAmapJsKey()
 }
 
+/** 必须在加载 maps 脚本之前设置 securityJsCode */
+function applySecurityConfig() {
+  const security = getAmapSecurityCode()
+  if (security) {
+    window._AMapSecurityConfig = { securityJsCode: security }
+  }
+}
+
 export function loadAmapJs(): Promise<AMapNamespace> {
   if (typeof window !== 'undefined' && window.AMap) {
+    applySecurityConfig()
     return Promise.resolve(window.AMap)
   }
   if (loading) return loading
@@ -48,10 +57,7 @@ export function loadAmapJs(): Promise<AMapNamespace> {
   const key = getAmapJsKey()
   if (!key) return Promise.reject(new Error('缺少 VITE_AMAP_JS_KEY'))
 
-  const security = getAmapSecurityCode()
-  if (security) {
-    window._AMapSecurityConfig = { securityJsCode: security }
-  }
+  applySecurityConfig()
 
   loading = new Promise((resolve, reject) => {
     const script = document.createElement('script')
@@ -61,7 +67,10 @@ export function loadAmapJs(): Promise<AMapNamespace> {
       if (window.AMap) resolve(window.AMap)
       else reject(new Error('AMap 加载失败'))
     }
-    script.onerror = () => reject(new Error('AMap 脚本加载失败'))
+    script.onerror = () => {
+      loading = null
+      reject(new Error('AMap 脚本加载失败（请检查 Key 类型为 Web端 JS API，并白名单 ppppan9.github.io）'))
+    }
     document.head.appendChild(script)
   })
   return loading

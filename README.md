@@ -111,6 +111,15 @@ VITE_AMAP_KEY=你的Web服务Key
 
 所有房源与公司位置仅保存在你的浏览器 `localStorage`，不会上传到任何服务器。可用「导出 JSON」备份或跨设备迁移。
 
+
+## 域名白名单（GitHub Pages）
+
+在高德控制台为 **Web端(JS API)** Key 配置安全域名 / 白名单：
+
+- `ppppan9.github.io`
+
+并填写与 Key 配套的「安全密钥」到 `VITE_AMAP_SECURITY_CODE`（Actions Secret）。Web服务 Key（`VITE_AMAP_KEY`）继续用于 inputtips / POI / 路线。
+
 ## License
 
 MIT

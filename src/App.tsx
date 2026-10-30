@@ -24,6 +24,7 @@ import type {
   RentalListing,
 } from './types'
 import { hasAmapKey } from './services/amap'
+import { canUseAmapJsMap } from './services/amapJsLoader'
 import { fetchCommute } from './services/routing'
 import { scoreListings } from './utils/score'
 import { exportJson, importJson, loadState, saveState } from './utils/storage'
@@ -364,7 +365,7 @@ export default function App() {
           <MapPin size={18} />
           <h1>北京租房通勤</h1>
           <span className={`pill ${demoMode ? 'warn' : 'ok'}`}>
-            {demoMode ? '演示' : '高德'}
+            {demoMode ? '演示' : canUseAmapJsMap() ? '高德矢量' : '高德'}
           </span>
         </div>
         <div className="topbar-actions">
