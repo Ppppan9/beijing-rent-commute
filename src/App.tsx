@@ -10,6 +10,7 @@ import {
   Bus,
   Car,
   ChevronUp,
+  Download,
 } from 'lucide-react'
 import MapView from './components/MapView'
 import CompanyPanel from './components/CompanyPanel'
@@ -27,7 +28,16 @@ import { hasAmapKey } from './services/amap'
 import { canUseAmapJsMap } from './services/amapJsLoader'
 import { fetchCommute } from './services/routing'
 import { scoreListings } from './utils/score'
-import { exportJson, importJson, loadState, saveState } from './utils/storage'
+import {
+  downloadExport,
+  importJson,
+  loadState,
+  markReminded,
+  resetAllData,
+  saveState,
+  shouldRemindBackup,
+  STORAGE_KEY,
+} from './utils/storage'
 import 'leaflet/dist/leaflet.css'
 import './App.css'
 
@@ -150,16 +160,28 @@ export default function App() {
     [pinMode, company],
   )
 
+  const [showBackupTip, setShowBackupTip] = useState(() => shouldRemindBackup(initial.listings.length))
+
   const handleExport = () => {
-    const blob = new Blob(
-      [exportJson({ company, listings, settings, version: 1 })],
-      { type: 'application/json' },
-    )
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `beijing-rent-commute-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(a.href)
+    downloadExport({ company, listings, settings, version: 1 })
+    setShowBackupTip(false)
+  }
+
+  const handleResetData = () => {
+    const n = listings.length
+    if (
+      !confirm(
+        `确定清空本地全部数据？\n当前有 ${n} 套房源。\n清空前会在本机留下一份备份键，但建议先点「导出备份」。`,
+      )
+    ) {
+      return
+    }
+    if (!confirm('再次确认：真的要清空吗？此操作需你主动触发，网站更新不会自动清空。')) return
+    resetAllData(true)
+    setCompany(null)
+    setListings([])
+    setCommuteMap({})
+    setSelectedId(null)
   }
 
   const handleImport = async (file: File) => {
@@ -413,6 +435,8 @@ export default function App() {
                   onChange={setSettings}
                   onExport={handleExport}
                   onImport={handleImport}
+                  onReset={handleResetData}
+                  storageKey={STORAGE_KEY}
                 />
               </div>
             )}
@@ -426,6 +450,29 @@ export default function App() {
         </div>
       </header>
 
+      {showBackupTip && listings.length >= 5 && (
+        <div className="backup-banner">
+          <span>
+            你已收藏 {listings.length} 套房源。数据只存在本机浏览器，网站更新不会清空；但换浏览器/清站点数据会丢。请先
+            <strong>导出备份</strong>。
+          </span>
+          <div className="backup-banner-actions">
+            <button type="button" className="btn btn-sm btn-primary" onClick={handleExport}>
+              <Download size={14} /> 立即导出
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              onClick={() => {
+                markReminded(listings.length)
+                setShowBackupTip(false)
+              }}
+            >
+              稍后
+            </button>
+          </div>
+        </div>
+      )}
       <div className="workspace">
         <aside className={`side-panel ${sidebarOpen ? 'open' : ''}`}>
           <div className="side-panel-inner">{panelBody}</div>

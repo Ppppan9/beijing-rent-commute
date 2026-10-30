@@ -1,4 +1,4 @@
-import { Download, Upload, Bus, Car } from 'lucide-react'
+import { Download, Upload, Bus, Car, Trash2 } from 'lucide-react'
 import type { AppSettings } from '../types'
 
 interface Props {
@@ -7,7 +7,8 @@ interface Props {
   onChange: (s: AppSettings) => void
   onExport: () => void
   onImport: (file: File) => void
-  compact?: boolean
+  onReset?: () => void
+  storageKey?: string
 }
 
 export default function SettingsBar({
@@ -16,6 +17,8 @@ export default function SettingsBar({
   onChange,
   onExport,
   onImport,
+  onReset,
+  storageKey,
 }: Props) {
   return (
     <div className="settings-popover-body">
@@ -27,6 +30,10 @@ export default function SettingsBar({
           <span className="badge-amap">高德 API</span>
         )}
       </div>
+      <p className="hint">
+        收藏数据保存在本机 <code>{storageKey || 'localStorage'}</code>
+        。代码/Pages 更新<strong>不会</strong>自动清空。清浏览器站点数据或换设备会丢失，请定期「导出备份」。
+      </p>
       <div className="mode-toggle">
         <button
           type="button"
@@ -70,8 +77,8 @@ export default function SettingsBar({
         </label>
       </div>
       <div className="btn-row">
-        <button type="button" className="btn btn-sm btn-ghost" onClick={onExport}>
-          <Download size={13} /> 导出
+        <button type="button" className="btn btn-sm btn-primary" onClick={onExport}>
+          <Download size={13} /> 导出备份
         </button>
         <label className="btn btn-sm btn-ghost file-btn">
           <Upload size={13} /> 导入
@@ -87,6 +94,11 @@ export default function SettingsBar({
           />
         </label>
       </div>
+      {onReset && (
+        <button type="button" className="btn btn-sm btn-danger btn-block" onClick={onReset}>
+          <Trash2 size={13} /> 清空本地数据（需确认）
+        </button>
+      )}
     </div>
   )
 }
