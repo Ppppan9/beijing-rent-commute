@@ -14,6 +14,60 @@ export interface GeoResult {
   address: string
   lat: number
   lng: number
+  district?: string
+  source?: string
+}
+
+function parseLoc(loc: unknown): { lat: number; lng: number } | null {
+  if (typeof loc !== 'string' || !loc.includes(',')) return null
+  const [lng, lat] = loc.split(',').map(Number)
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return null
+  return { lat, lng }
+}
+
+/** 输入提示（北京限定），无坐标的 tip 通过 place/detail 补全 */
+export async function amapInputTips(keywords: string): Promise<GeoResult[]> {
+  const key = getAmapKey()
+  if (!key) return []
+  try {
+    const url = `https://restapi.amap.com/v3/assistant/inputtips?keywords=${encodeURIComponent(keywords)}&city=北京&citylimit=true&datatype=all&key=${key}`
+    const data = await (await fetch(url)).json()
+    if (data.status !== '1' || !Array.isArray(data.tips)) return []
+    const tips = data.tips as { id?: string; name: string; district?: string; address?: unknown; location?: unknown }[]
+    const out = await Promise.all(
+      tips.slice(0, 10).map(async (tip) => {
+        let loc = parseLoc(tip.location)
+        if (!loc && typeof tip.id === 'string' && tip.id) {
+          loc = await amapPlaceDetail(tip.id)
+        }
+        if (!loc) return null
+        const addr = typeof tip.address === 'string' ? tip.address : ''
+        return {
+          name: tip.name,
+          district: tip.district || '',
+          address: `${tip.district || ''}${addr}` || tip.name,
+          lat: loc.lat,
+          lng: loc.lng,
+          source: 'tips',
+        } as GeoResult
+      }),
+    )
+    return out.filter((x): x is GeoResult => !!x)
+  } catch (e) {
+    console.warn('[高德] inputtips 错误', e)
+    return []
+  }
+}
+
+export async function amapPlaceDetail(id: string): Promise<{ lat: number; lng: number } | null> {
+  const key = getAmapKey()
+  if (!key) return null
+  try {
+    const data = await (await fetch(`https://restapi.amap.com/v3/place/detail?id=${encodeURIComponent(id)}&key=${key}`)).json()
+    return parseLoc(data.pois?.[0]?.location)
+  } catch {
+    return null
+  }
 }
 
 function warnAmap(api: string, data: { status?: string; info?: string; infocode?: string }) {
@@ -46,7 +100,7 @@ export async function amapSearch(keywords: string): Promise<GeoResult[]> {
   const key = getAmapKey()
   if (!key) return []
   try {
-    const url = `https://restapi.amap.com/v3/place/text?keywords=${encodeURIComponent(keywords)}&city=北京&offset=8&key=${key}&extensions=base`
+    const url = `https://restapi.amap.com/v3/place/text?keywords=${encodeURIComponent(keywords)}&city=北京&citylimit=true&types=${encodeURIComponent('120000|120300|120302|120303|120200|170000|150000')}&offset=10&key=${key}&extensions=base`
     const res = await fetch(url)
     const data = await res.json()
     warnAmap('place/text', data)
@@ -64,7 +118,7 @@ export async function amapSearch(keywords: string): Promise<GeoResult[]> {
         }) => {
           const [lng, lat] = p.location.split(',').map(Number)
           const address = [p.pname, p.cityname, p.adname, p.address].filter(Boolean).join('')
-          return { name: p.name, address: address || p.name, lat, lng }
+          return { name: p.name, district: [p.cityname, p.adname].filter(Boolean).join(''), address: address || p.name, lat, lng, source: 'place' }
         },
       )
   } catch (e) {

@@ -29,7 +29,7 @@ export default function CompanyPanel({
   return (
     <div className="compact-block">
       <div className="compact-label">公司</div>
-      <SearchBox placeholder="搜索公司 / 写字楼…" onSelect={apply} />
+      <SearchBox placeholder="搜索公司 / 写字楼…" onSelect={apply} onPickOnMap={onTogglePin} />
       <div className="compact-actions">
         <button
           type="button"

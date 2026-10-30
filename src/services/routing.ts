@@ -1,5 +1,6 @@
 import type { CommuteInfo, CommuteRoute, LatLng } from '../types'
-import { amapDriving, amapGeocode, amapSearch, amapTransit, hasAmapKey } from './amap'
+import { amapDriving, amapGeocode, amapInputTips, amapSearch, amapTransit, hasAmapKey } from './amap'
+import type { GeoResult } from './amap'
 import {
   demoSearch,
   estimateDrivingFallback,
@@ -79,20 +80,23 @@ export async function fetchCommute(from: LatLng, to: LatLng): Promise<CommuteInf
   return demoCommute(from, to)
 }
 
-export async function searchPlaces(keywords: string) {
+export async function searchPlaces(keywords: string): Promise<GeoResult[]> {
   if (hasAmapKey()) {
-    const [pois, geos] = await Promise.all([amapSearch(keywords), amapGeocode(keywords)])
-    const merged = [...pois]
-    const seen = new Set(pois.map((p) => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`))
-    for (const g of geos) {
-      const k = `${g.lat.toFixed(4)},${g.lng.toFixed(4)}`
-      if (!seen.has(k)) {
-        merged.push(g)
-        seen.add(k)
+    const seen = new Set<string>()
+    const merged: GeoResult[] = []
+    const add = (list: GeoResult[]) => {
+      for (const r of list) {
+        const k = `${r.name}|${r.lat.toFixed(4)},${r.lng.toFixed(4)}`
+        if (!seen.has(k)) {
+          seen.add(k)
+          merged.push(r)
+        }
       }
     }
-    if (merged.length) return merged
-    // Soft fallback if Amap search empty
+    add(await amapInputTips(keywords))
+    if (merged.length < 3) add(await amapSearch(keywords))
+    if (merged.length === 0) add(await amapGeocode(keywords))
+    if (merged.length) return merged.slice(0, 12)
     return demoSearch(keywords)
   }
   return demoSearch(keywords)

@@ -137,7 +137,7 @@ export default function RentalForm({
     setDraft(emptyDraft())
   }
 
-  if (!open) return null
+  if (!open || pinActive) return null
 
   const set = (key: keyof Draft, value: string) =>
     setDraft((d) => ({ ...d, [key]: value }))
@@ -153,7 +153,7 @@ export default function RentalForm({
         </button>
       </div>
       <form onSubmit={submit} className="form-grid">
-        <SearchBox placeholder="搜索房源地址…" onSelect={applySearch} />
+        <SearchBox placeholder="输入小区名，如 天通苑 / 龙泽苑…" onSelect={applySearch} onPickOnMap={onTogglePin} />
         <div className="btn-row">
           <button
             type="button"

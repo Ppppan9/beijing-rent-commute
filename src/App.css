@@ -771,3 +771,9 @@
   .workspace { grid-template-columns: 280px 1fr; }
   .side-panel-inner { width: 280px; }
 }
+
+.search-dropdown .district { color:#2563eb; font-weight:700; margin-right:4px; }
+.search-dropdown li.empty { cursor:default; font-size:0.78rem; }
+.search-dropdown li.map-fallback { color:#2563eb; font-weight:700; border-top:1px solid #e2e8f0; font-size:0.8rem; align-items:center; }
+.map-fallback-link { border:none; background:none; color:#2563eb; font-size:0.72rem; font-weight:600; padding:4px 2px 0; cursor:pointer; }
+.map-fallback-link:hover { text-decoration:underline; }
