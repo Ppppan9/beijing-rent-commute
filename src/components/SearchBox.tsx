@@ -85,7 +85,11 @@ export default function SearchBox({ placeholder = '搜索北京小区 / 地址�
       </div>
       {open && (results.length > 0 || searched) && (
         <ul className="search-dropdown">
-          {results.length === 0 && <li className="empty">没有找到，换个关键词（如去掉“小区”）</li>}
+          {results.length === 0 && (
+            <li className="empty">
+              高德未找到较匹配的「{q}」。可缩短关键词（如只搜品牌名），或下方地图点选。
+            </li>
+          )}
           {results.map((r, i) => (
             <li
               key={`${r.lat}-${r.lng}-${i}`}
@@ -112,14 +116,14 @@ export default function SearchBox({ placeholder = '搜索北京小区 / 地址�
                 onPickOnMap()
               }}
             >
-              <MapPin size={14} /> 搜不到？在地图上点选
+              <MapPin size={14} /> 搜不到准确结果？在地图上点选定位
             </li>
           )}
         </ul>
       )}
       {onPickOnMap && (
         <button type="button" className="map-fallback-link" onClick={onPickOnMap}>
-          搜不到？在地图上点选
+          搜不到准确结果？在地图上点选定位
         </button>
       )}
     </div>

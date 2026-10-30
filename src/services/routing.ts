@@ -16,6 +16,7 @@ import {
   haversineKm,
   osrmDriving,
 } from './demoGeo'
+import { nameRelevance, queryVariants, rankAndFilter } from '../utils/searchRank'
 
 function toDriving(
   raw: {
@@ -59,7 +60,6 @@ function toTransit(
   }
 }
 
-/** 仅无高德 Key 时使用（OSRM / 本地估算） */
 async function demoCommute(from: LatLng, to: LatLng): Promise<CommuteInfo> {
   const osrm = await osrmDriving(from, to)
   const driving = osrm
@@ -73,7 +73,6 @@ async function demoCommute(from: LatLng, to: LatLng): Promise<CommuteInfo> {
   }
 }
 
-/** 有高德 Key 时绝不调用 OSRM/Nominatim；接口失败则用本地几何估算 */
 function amapSoftEstimate(from: LatLng, to: LatLng): CommuteInfo {
   return {
     driving: toDriving(estimateDrivingFallback(from, to), from, to, true),
@@ -89,7 +88,6 @@ export async function fetchCommute(from: LatLng, to: LatLng): Promise<CommuteInf
 
   const dist = haversineKm(from, to)
   const tasks: Promise<unknown>[] = [amapDriving(from, to), amapTransit(from, to)]
-  // 短距离补充步行（高德 walking）
   if (dist <= 3) tasks.push(amapWalking(from, to))
 
   const [drivingRaw, transitRaw, walkingRaw] = (await Promise.all(tasks)) as [
@@ -125,37 +123,59 @@ export async function fetchCommute(from: LatLng, to: LatLng): Promise<CommuteInf
   return amapSoftEstimate(from, to)
 }
 
+function dedupe(list: GeoResult[]): GeoResult[] {
+  const seen = new Set<string>()
+  const out: GeoResult[] = []
+  for (const r of list) {
+    const k = `${r.name}|${r.lat.toFixed(4)},${r.lng.toFixed(4)}`
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(r)
+  }
+  return out
+}
+
+/**
+ * 北京地点搜索：多查询变体 + 相关度过滤。
+ * 有高德 Key 时绝不回退 Nominatim；无可靠命中则返回 []（UI 提示地图点选）。
+ */
 export async function searchPlaces(keywords: string): Promise<GeoResult[]> {
+  const q = keywords.trim()
+  if (!q) return []
+
   if (!hasAmapKey()) {
-    return demoSearch(keywords)
+    return rankAndFilter(q, await demoSearch(q)).map(({ score: _s, ...r }) => r)
   }
 
-  const seen = new Set<string>()
-  const merged: GeoResult[] = []
-  const add = (list: GeoResult[]) => {
-    for (const r of list) {
-      const k = `${r.name}|${r.lat.toFixed(4)},${r.lng.toFixed(4)}`
-      if (!seen.has(k)) {
-        seen.add(k)
-        merged.push(r)
-      }
+  const variants = queryVariants(q)
+  // 1) 对每个变体拉 inputtips（呈柿酒店式公寓 → 呈柿 才能命中品牌）
+  const tipBatches = await Promise.all(variants.map((v) => amapInputTips(v)))
+  let merged = dedupe(tipBatches.flat())
+
+  // 2) 仅当 tips 相关度不足时，再用 place/text（避免「公寓」泛匹配污染）
+  const tipBest = merged.reduce((m, r) => Math.max(m, nameRelevance(q, r.name)), 0)
+  if (tipBest < 70) {
+    const placeQueries = variants.slice(0, 2)
+    const placeBatches = await Promise.all(
+      placeQueries.flatMap((v) => [amapSearch(v, true), amapSearch(v, false)]),
+    )
+    merged = dedupe([...merged, ...placeBatches.flat()])
+  }
+
+  let ranked = rankAndFilter(q, merged, 40)
+
+  // 3) 仍无可靠结果 → geocode（同样过滤）
+  if (ranked.length === 0) {
+    const geos = await amapGeocode(q)
+    ranked = rankAndFilter(q, geos, 40)
+    // geocode 常把整句糊成无关 POI；核心词不在地址里则丢弃
+    if (ranked.length === 0) {
+      const coreGeos = await Promise.all(
+        variants.slice(1, 3).map((v) => amapGeocode(v)),
+      )
+      ranked = rankAndFilter(q, dedupe(coreGeos.flat()), 50)
     }
   }
 
-  // 并行：输入提示 + 住宅 POI + 全类型 POI
-  const [tips, residential, general] = await Promise.all([
-    amapInputTips(keywords),
-    amapSearch(keywords, true),
-    amapSearch(keywords, false),
-  ])
-  add(tips)
-  add(residential)
-  add(general)
-
-  if (merged.length === 0) {
-    add(await amapGeocode(keywords))
-  }
-
-  // 有高德 Key 时不回退 Nominatim/OSM
-  return merged.slice(0, 12)
+  return ranked.slice(0, 10).map(({ score: _s, ...r }) => r as GeoResult)
 }
