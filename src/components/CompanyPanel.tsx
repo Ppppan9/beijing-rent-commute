@@ -1,4 +1,4 @@
-import { Building2, Crosshair } from 'lucide-react'
+import { Crosshair, X } from 'lucide-react'
 import SearchBox from './SearchBox'
 import type { CompanyLocation } from '../types'
 import type { GeoResult } from '../services/amap'
@@ -27,36 +27,30 @@ export default function CompanyPanel({
   }
 
   return (
-    <section className="panel">
-      <div className="panel-title">
-        <Building2 size={18} />
-        <h2>公司位置</h2>
-      </div>
-      <SearchBox placeholder="搜索公司地址 / 写字楼…" onSelect={apply} />
-      <div className="btn-row">
+    <div className="compact-block">
+      <div className="compact-label">公司</div>
+      <SearchBox placeholder="搜索公司 / 写字楼…" onSelect={apply} />
+      <div className="compact-actions">
         <button
           type="button"
-          className={`btn ${pinActive ? 'btn-primary' : 'btn-ghost'}`}
+          className={`btn btn-sm ${pinActive ? 'btn-primary' : 'btn-ghost'}`}
           onClick={onTogglePin}
         >
-          <Crosshair size={14} />
-          {pinActive ? '点选中…再点取消' : '地图选点'}
+          <Crosshair size={13} />
+          {pinActive ? '点选中…' : '地图选点'}
         </button>
         {company && (
-          <button type="button" className="btn btn-ghost" onClick={onClear}>
-            清除
+          <button type="button" className="btn btn-sm btn-ghost" onClick={onClear}>
+            <X size={13} /> 清除
           </button>
         )}
       </div>
       {company && (
-        <div className="info-card company-card">
-          <div className="info-name">{company.name}</div>
-          <div className="info-addr">{company.address}</div>
-          <div className="info-meta">
-            {company.position.lat.toFixed(5)}, {company.position.lng.toFixed(5)}
-          </div>
+        <div className="compact-chip" title={company.address}>
+          <strong>{company.name}</strong>
+          <span>{company.address}</span>
         </div>
       )}
-    </section>
+    </div>
   )
 }

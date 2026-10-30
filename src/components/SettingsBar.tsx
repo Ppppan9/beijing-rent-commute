@@ -1,4 +1,4 @@
-import { Download, Upload, Settings2, Bus, Car } from 'lucide-react'
+import { Download, Upload, Bus, Car } from 'lucide-react'
 import type { AppSettings } from '../types'
 
 interface Props {
@@ -7,6 +7,7 @@ interface Props {
   onChange: (s: AppSettings) => void
   onExport: () => void
   onImport: (file: File) => void
+  compact?: boolean
 }
 
 export default function SettingsBar({
@@ -17,34 +18,34 @@ export default function SettingsBar({
   onImport,
 }: Props) {
   return (
-    <section className="panel settings-panel">
-      <div className="panel-title">
-        <Settings2 size={18} />
-        <h2>偏好与数据</h2>
-        {demoMode && <span className="badge-demo">演示模式</span>}
-        {!demoMode && <span className="badge-amap">高德 API</span>}
+    <div className="settings-popover-body">
+      <div className="settings-head">
+        <span>偏好与数据</span>
+        {demoMode ? (
+          <span className="badge-demo">演示</span>
+        ) : (
+          <span className="badge-amap">高德 API</span>
+        )}
       </div>
-
       <div className="mode-toggle">
         <button
           type="button"
-          className={`btn ${settings.preferredMode === 'transit' ? 'btn-primary' : 'btn-ghost'}`}
+          className={`btn btn-sm ${settings.preferredMode === 'transit' ? 'btn-primary' : 'btn-ghost'}`}
           onClick={() => onChange({ ...settings, preferredMode: 'transit' })}
         >
-          <Bus size={14} /> 公交优先
+          <Bus size={13} /> 公交
         </button>
         <button
           type="button"
-          className={`btn ${settings.preferredMode === 'driving' ? 'btn-primary' : 'btn-ghost'}`}
+          className={`btn btn-sm ${settings.preferredMode === 'driving' ? 'btn-primary' : 'btn-ghost'}`}
           onClick={() => onChange({ ...settings, preferredMode: 'driving' })}
         >
-          <Car size={14} /> 驾车优先
+          <Car size={13} /> 驾车
         </button>
       </div>
-
       <div className="form-2col">
         <label>
-          默认地铁单程 (¥)
+          地铁单程 ¥
           <input
             type="number"
             min={0}
@@ -68,13 +69,12 @@ export default function SettingsBar({
           />
         </label>
       </div>
-
       <div className="btn-row">
-        <button type="button" className="btn btn-ghost" onClick={onExport}>
-          <Download size={14} /> 导出 JSON
+        <button type="button" className="btn btn-sm btn-ghost" onClick={onExport}>
+          <Download size={13} /> 导出
         </button>
-        <label className="btn btn-ghost file-btn">
-          <Upload size={14} /> 导入 JSON
+        <label className="btn btn-sm btn-ghost file-btn">
+          <Upload size={13} /> 导入
           <input
             type="file"
             accept="application/json,.json"
@@ -87,11 +87,6 @@ export default function SettingsBar({
           />
         </label>
       </div>
-      {demoMode && (
-        <p className="hint">
-          底图始终使用<strong>高德</strong>矢量/影像瓦片（无需 Carto Key）。未配置 <code>VITE_AMAP_KEY</code>（Web服务）时：搜索与路线为演示估算；配置后启用真实地理编码与公交/驾车。
-        </p>
-      )}
-    </section>
+    </div>
   )
 }

@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { MapPin, Sparkles, Filter } from 'lucide-react'
+import {
+  MapPin,
+  Sparkles,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Table2,
+  Settings2,
+  Bus,
+  Car,
+  ChevronUp,
+} from 'lucide-react'
 import MapView from './components/MapView'
 import CompanyPanel from './components/CompanyPanel'
 import RentalForm from './components/RentalForm'
@@ -36,16 +47,17 @@ export default function App() {
   const [sortKey, setSortKey] = useState<SortKey>('score')
   const [maxCommute, setMaxCommute] = useState<number>(120)
   const [maxRent, setMaxRent] = useState<number>(20000)
-  const [mobileTab, setMobileTab] = useState<'list' | 'map' | 'compare'>('list')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [compareOpen, setCompareOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [sheetExpanded, setSheetExpanded] = useState(false)
 
   const demoMode = !hasAmapKey()
 
-  // Persist
   useEffect(() => {
     saveState({ company, listings, settings, version: 1 })
   }, [company, listings, settings])
 
-  // Fetch commute when company or listings change
   useEffect(() => {
     if (!company || listings.length === 0) {
       setCommuteMap({})
@@ -53,10 +65,9 @@ export default function App() {
     }
     let cancelled = false
     const run = async () => {
-      const next: Record<string, CommuteInfo | null> = { ...commuteMap }
+      const next: Record<string, CommuteInfo | null> = {}
       await Promise.all(
         listings.map(async (l) => {
-          // skip if already have for same endpoints roughly — always refresh for simplicity when list/company changes
           try {
             next[l.id] = await fetchCommute(l.position, company.position)
           } catch {
@@ -64,7 +75,7 @@ export default function App() {
           }
         }),
       )
-      if (!cancelled) setCommuteMap({ ...next })
+      if (!cancelled) setCommuteMap(next)
     }
     void run()
     return () => {
@@ -234,182 +245,192 @@ export default function App() {
     ])
     setCommuteMap({})
     setSelectedId('demo-2')
+    setSidebarOpen(true)
   }
 
-  return (
-    <div className="app">
-      <header className="app-header">
-        <div className="brand">
-          <MapPin size={22} />
-          <div>
-            <h1>北京租房通勤对比</h1>
-            <p>地图路线 · 成本核算 · 性价比推荐</p>
-          </div>
+  const openAdd = () => {
+    setEditing(null)
+    setPendingPin(null)
+    setFormOpen(true)
+    setSidebarOpen(true)
+  }
+
+  const panelBody = (
+    <>
+      <CompanyPanel
+        company={company}
+        pinActive={pinMode === 'company'}
+        onSetCompany={(c) => {
+          setCompany(c)
+          setPinMode(null)
+        }}
+        onTogglePin={() => setPinMode((m) => (m === 'company' ? null : 'company'))}
+        onClear={() => setCompany(null)}
+      />
+
+      <div className="compact-block">
+        <button type="button" className="btn btn-primary btn-block btn-sm" onClick={openAdd}>
+          <Plus size={14} /> 添加房源
+        </button>
+      </div>
+
+      <div className="compact-block filters-row">
+        <label>
+          排序
+          <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
+            <option value="score">推荐分</option>
+            <option value="commute">通勤</option>
+            <option value="cost">有效成本</option>
+            <option value="rent">月租</option>
+          </select>
+        </label>
+        <label>
+          ≤通勤分
+          <input
+            type="number"
+            min={10}
+            max={180}
+            value={maxCommute}
+            onChange={(e) => setMaxCommute(Number(e.target.value) || 120)}
+          />
+        </label>
+        <label>
+          ≤月租
+          <input
+            type="number"
+            min={500}
+            step={100}
+            value={maxRent}
+            onChange={(e) => setMaxRent(Number(e.target.value) || 20000)}
+          />
+        </label>
+      </div>
+
+      <div className="listing-list dense">
+        <div className="list-count">
+          房源 {filtered.length}/{listings.length}
+          {!company && listings.length > 0 ? ' · 请先设公司' : ''}
         </div>
-        <div className="header-actions">
+        {filtered.map((item) => (
+          <ListingCard
+            key={item.listing.id}
+            item={item}
+            selected={selectedId === item.listing.id}
+            preferredMode={settings.preferredMode}
+            onSelect={() => {
+              setSelectedId(item.listing.id)
+              setSheetExpanded(false)
+            }}
+            onEdit={() => {
+              setEditing(item.listing)
+              setFormOpen(true)
+            }}
+            onDelete={() => {
+              if (confirm(`删除「${item.listing.name}」？`)) {
+                setListings((prev) => prev.filter((x) => x.id !== item.listing.id))
+                setCommuteMap((m) => {
+                  const n = { ...m }
+                  delete n[item.listing.id]
+                  return n
+                })
+              }
+            }}
+          />
+        ))}
+        {listings.length === 0 && (
+          <p className="hint">
+            还没有房源。点「添加房源」或
+            <button type="button" className="linkish" onClick={loadDemo}>
+              加载示例
+            </button>
+          </p>
+        )}
+      </div>
+    </>
+  )
+
+  return (
+    <div className={`app map-first ${sidebarOpen ? 'sidebar-open' : 'sidebar-collapsed'} ${compareOpen ? 'compare-open' : ''}`}>
+      <header className="topbar">
+        <button
+          type="button"
+          className="icon-btn topbar-toggle desktop-only"
+          title={sidebarOpen ? '收起面板' : '展开面板'}
+          onClick={() => setSidebarOpen((v) => !v)}
+        >
+          {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+        </button>
+        <div className="brand">
+          <MapPin size={18} />
+          <h1>北京租房通勤</h1>
+          <span className={`pill ${demoMode ? 'warn' : 'ok'}`}>
+            {demoMode ? '演示' : '高德'}
+          </span>
+        </div>
+        <div className="topbar-actions">
+          <div className="seg">
+            <button
+              type="button"
+              className={settings.preferredMode === 'transit' ? 'active' : ''}
+              onClick={() => setSettings({ ...settings, preferredMode: 'transit' })}
+              title="公交优先"
+            >
+              <Bus size={14} />
+              <span className="hide-sm">公交</span>
+            </button>
+            <button
+              type="button"
+              className={settings.preferredMode === 'driving' ? 'active' : ''}
+              onClick={() => setSettings({ ...settings, preferredMode: 'driving' })}
+              title="驾车优先"
+            >
+              <Car size={14} />
+              <span className="hide-sm">驾车</span>
+            </button>
+          </div>
+          <button
+            type="button"
+            className={`btn btn-sm ${compareOpen ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setCompareOpen((v) => !v)}
+          >
+            <Table2 size={14} />
+            <span className="hide-sm">对比</span>
+          </button>
+          <div className="settings-wrap">
+            <button
+              type="button"
+              className={`btn btn-sm btn-ghost ${settingsOpen ? 'btn-primary' : ''}`}
+              onClick={() => setSettingsOpen((v) => !v)}
+            >
+              <Settings2 size={14} />
+            </button>
+            {settingsOpen && (
+              <div className="settings-dropdown">
+                <SettingsBar
+                  settings={settings}
+                  demoMode={demoMode}
+                  onChange={setSettings}
+                  onExport={handleExport}
+                  onImport={handleImport}
+                />
+              </div>
+            )}
+          </div>
           {listings.length === 0 && (
-            <button type="button" className="btn btn-primary" onClick={loadDemo}>
-              <Sparkles size={14} /> 加载示例数据
+            <button type="button" className="btn btn-sm btn-primary" onClick={loadDemo}>
+              <Sparkles size={14} />
+              <span className="hide-sm">示例</span>
             </button>
           )}
         </div>
       </header>
 
-      <nav className="mobile-tabs">
-        <button
-          type="button"
-          className={mobileTab === 'list' ? 'active' : ''}
-          onClick={() => setMobileTab('list')}
-        >
-          列表
-        </button>
-        <button
-          type="button"
-          className={mobileTab === 'map' ? 'active' : ''}
-          onClick={() => setMobileTab('map')}
-        >
-          地图
-        </button>
-        <button
-          type="button"
-          className={mobileTab === 'compare' ? 'active' : ''}
-          onClick={() => setMobileTab('compare')}
-        >
-          对比
-        </button>
-      </nav>
-
-      <div className="app-body">
-        <aside className={`sidebar ${mobileTab === 'list' ? 'show' : ''}`}>
-          <CompanyPanel
-            company={company}
-            pinActive={pinMode === 'company'}
-            onSetCompany={(c) => {
-              setCompany(c)
-              setPinMode(null)
-            }}
-            onTogglePin={() => setPinMode((m) => (m === 'company' ? null : 'company'))}
-            onClear={() => setCompany(null)}
-          />
-
-          <RentalForm
-            open={formOpen}
-            onOpen={() => {
-              setEditing(null)
-              setPendingPin(null)
-              setFormOpen(true)
-            }}
-            editing={editing}
-            pinActive={pinMode === 'rental'}
-            pendingPin={pendingPin}
-            existingCount={listings.length}
-            onTogglePin={() => setPinMode((m) => (m === 'rental' ? null : 'rental'))}
-            onSave={(listing) => {
-              setListings((prev) => {
-                const idx = prev.findIndex((x) => x.id === listing.id)
-                if (idx >= 0) {
-                  const copy = [...prev]
-                  copy[idx] = listing
-                  return copy
-                }
-                return [...prev, listing]
-              })
-              setFormOpen(false)
-              setEditing(null)
-              setPendingPin(null)
-              setSelectedId(listing.id)
-            }}
-            onCancel={() => {
-              setFormOpen(false)
-              setEditing(null)
-              setPendingPin(null)
-              setPinMode((m) => (m === 'rental' ? null : m))
-            }}
-          />
-
-          <section className="panel">
-            <div className="panel-title">
-              <Filter size={18} />
-              <h2>排序筛选</h2>
-            </div>
-            <div className="form-2col">
-              <label>
-                排序
-                <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
-                  <option value="score">推荐分</option>
-                  <option value="commute">通勤时长</option>
-                  <option value="cost">有效月成本</option>
-                  <option value="rent">月租金</option>
-                </select>
-              </label>
-              <label>
-                最长通勤 (分)
-                <input
-                  type="number"
-                  min={10}
-                  max={180}
-                  value={maxCommute}
-                  onChange={(e) => setMaxCommute(Number(e.target.value) || 120)}
-                />
-              </label>
-            </div>
-            <label>
-              最高月租 (¥)
-              <input
-                type="number"
-                min={500}
-                step={100}
-                value={maxRent}
-                onChange={(e) => setMaxRent(Number(e.target.value) || 20000)}
-              />
-            </label>
-          </section>
-
-          <div className="listing-list">
-            {!company && listings.length > 0 && (
-              <p className="hint warn">请先设置公司位置，才能计算通勤与推荐分。</p>
-            )}
-            {filtered.map((item) => (
-              <ListingCard
-                key={item.listing.id}
-                item={item}
-                selected={selectedId === item.listing.id}
-                preferredMode={settings.preferredMode}
-                onSelect={() => {
-                  setSelectedId(item.listing.id)
-                  setMobileTab('map')
-                }}
-                onEdit={() => {
-                  setEditing(item.listing)
-                  setFormOpen(true)
-                }}
-                onDelete={() => {
-                  if (confirm(`删除「${item.listing.name}」？`)) {
-                    setListings((prev) => prev.filter((x) => x.id !== item.listing.id))
-                    setCommuteMap((m) => {
-                      const n = { ...m }
-                      delete n[item.listing.id]
-                      return n
-                    })
-                  }
-                }}
-              />
-            ))}
-            {listings.length === 0 && (
-              <p className="hint">还没有收藏房源。搜索地址、地图选点，或加载示例数据开始对比。</p>
-            )}
-          </div>
-
-          <SettingsBar
-            settings={settings}
-            demoMode={demoMode}
-            onChange={setSettings}
-            onExport={handleExport}
-            onImport={handleImport}
-          />
+      <div className="workspace">
+        <aside className={`side-panel ${sidebarOpen ? 'open' : ''}`}>
+          <div className="side-panel-inner">{panelBody}</div>
         </aside>
 
-        <main className={`main-map ${mobileTab === 'map' ? 'show' : ''}`}>
+        <main className="map-stage">
           <MapView
             company={company}
             listings={listings}
@@ -421,19 +442,73 @@ export default function App() {
             onMapPick={onMapPick}
             onSelectListing={setSelectedId}
           />
+          {!sidebarOpen && (
+            <button
+              type="button"
+              className="fab-panel desktop-only"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <PanelLeftOpen size={16} /> 面板
+            </button>
+          )}
         </main>
       </div>
 
-      <div className={`compare-dock ${mobileTab === 'compare' ? 'show' : ''}`}>
+      {/* Mobile bottom sheet */}
+      <div className={`mobile-sheet ${sheetExpanded ? 'expanded' : ''}`}>
+        <button
+          type="button"
+          className="sheet-handle"
+          onClick={() => setSheetExpanded((v) => !v)}
+        >
+          <span className="grip" />
+          <span>
+            房源 {filtered.length} · {sheetExpanded ? '收起' : '展开列表'}
+          </span>
+          <ChevronUp size={16} className={sheetExpanded ? '' : 'flip'} />
+        </button>
+        {sheetExpanded && <div className="sheet-body">{panelBody}</div>}
+      </div>
+
+      <div className={`compare-drawer ${compareOpen ? 'open' : ''}`}>
+        <div className="compare-drawer-bar">
+          <strong>对比表</strong>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={() => setCompareOpen(false)}>
+            关闭
+          </button>
+        </div>
         <CompareTable items={filtered} preferredMode={settings.preferredMode} />
       </div>
 
-      <footer className="app-footer">
-        <span>开源 MIT · 数据仅存于本机浏览器 localStorage</span>
-        <span>
-          {demoMode ? '演示模式（高德底图）' : '高德地图 + 路线'} · 推荐分相对当前收藏集归一化
-        </span>
-      </footer>
+      <RentalForm
+        open={formOpen}
+        editing={editing}
+        pinActive={pinMode === 'rental'}
+        pendingPin={pendingPin}
+        existingCount={listings.length}
+        onTogglePin={() => setPinMode((m) => (m === 'rental' ? null : 'rental'))}
+        onSave={(listing) => {
+          setListings((prev) => {
+            const idx = prev.findIndex((x) => x.id === listing.id)
+            if (idx >= 0) {
+              const copy = [...prev]
+              copy[idx] = listing
+              return copy
+            }
+            return [...prev, listing]
+          })
+          setFormOpen(false)
+          setEditing(null)
+          setPendingPin(null)
+          setSelectedId(listing.id)
+        }}
+        onCancel={() => {
+          setFormOpen(false)
+          setEditing(null)
+          setPendingPin(null)
+          setPinMode((m) => (m === 'rental' ? null : m))
+        }}
+      />
     </div>
   )
 }

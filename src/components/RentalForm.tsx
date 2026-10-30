@@ -45,7 +45,7 @@ interface Props {
   onSave: (listing: RentalListing) => void
   onCancel: () => void
   open: boolean
-  onOpen: () => void
+  onOpen?: () => void
 }
 
 export default function RentalForm({
@@ -57,7 +57,6 @@ export default function RentalForm({
   onSave,
   onCancel,
   open,
-  onOpen,
 }: Props) {
   const [draft, setDraft] = useState<Draft>(emptyDraft())
 
@@ -138,21 +137,14 @@ export default function RentalForm({
     setDraft(emptyDraft())
   }
 
-  if (!open) {
-    return (
-      <section className="panel">
-        <button type="button" className="btn btn-primary btn-block" onClick={onOpen}>
-          <Home size={16} /> 添加收藏房源
-        </button>
-      </section>
-    )
-  }
+  if (!open) return null
 
   const set = (key: keyof Draft, value: string) =>
     setDraft((d) => ({ ...d, [key]: value }))
 
   return (
-    <section className="panel">
+    <div className="modal-backdrop" onClick={onCancel}>
+      <section className="panel modal-panel" onClick={(e) => e.stopPropagation()}>
       <div className="panel-title">
         <Home size={18} />
         <h2>{editing ? '编辑房源' : '添加房源'}</h2>
@@ -275,5 +267,6 @@ export default function RentalForm({
         </button>
       </form>
     </section>
+    </div>
   )
 }
