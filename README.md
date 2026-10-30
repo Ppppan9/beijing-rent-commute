@@ -46,7 +46,7 @@
 ## 技术栈
 
 - Vite + React + TypeScript
-- Leaflet + **CARTO Voyager / Positron** 现代底图（可切换；含 OSM+CARTO 署名）
+- Leaflet + **高德底图**（标准矢量 / 影像，可切换；GCJ-02，与路线坐标一致）
 - 可选：高德 Web 服务 API（地理编码 / 驾车 / 公交）
 - 无后端，数据存 `localStorage`
 
@@ -85,7 +85,16 @@ VITE_AMAP_KEY=你的Web服务Key
 5. 重启 `npm run dev`
 
 > 浏览器直调高德 REST 时，请在控制台按官方要求配置安全密钥 / 域名白名单（GitHub Pages 域名为 `ppppan9.github.io`）。
-> 若未配置 Key，应用自动进入**演示模式**：CARTO 现代底图、北京地标 + Nominatim 搜索、OSRM 驾车与公交估算，UI 与成本逻辑仍完整可用。
+> 底图始终为高德瓦片。若未配置 Web服务 Key，搜索/路线进入**演示模式**（地标 + Nominatim + OSRM/估算）；配置 `VITE_AMAP_KEY` 后启用真实 POI/公交/驾车。
+
+### 关于 Key 类型
+
+| 环境变量 | 高德控制台类型 | 用途 |
+|----------|----------------|------|
+| `VITE_AMAP_KEY` | **Web服务** | POI 搜索、地理编码、驾车/公交路线（当前线上已用） |
+| `VITE_AMAP_JS_KEY` | **Web端(JS API)** | 预留给官方 `AMap.Map` JS 底图；当前底图使用高德公开栅格瓦片，**可不填**也能显示北京地图 |
+
+申请入口：[高德控制台 - 应用管理](https://console.amap.com/dev/key/app)。请为 Pages 域名 `ppppan9.github.io` 配置白名单。
 
 ### GitHub Actions 注入 Key（可选）
 

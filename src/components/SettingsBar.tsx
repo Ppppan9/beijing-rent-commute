@@ -89,7 +89,7 @@ export default function SettingsBar({
       </div>
       {demoMode && (
         <p className="hint">
-          未配置 <code>VITE_AMAP_KEY</code>：使用 CARTO Voyager/Positron 底图 + 地标/Nominatim 搜索 + OSRM/估算路线。配置高德 Key 后可获北京公交真实路线。
+          底图始终使用<strong>高德</strong>矢量/影像瓦片（无需 Carto Key）。未配置 <code>VITE_AMAP_KEY</code>（Web服务）时：搜索与路线为演示估算；配置后启用真实地理编码与公交/驾车。
         </p>
       )}
     </section>

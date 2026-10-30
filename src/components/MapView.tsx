@@ -11,25 +11,27 @@ import {
 import L from 'leaflet'
 import type { CompanyLocation, CommuteInfo, RentalListing } from '../types'
 
-type BasemapId = 'voyager' | 'positron'
+type BasemapId = 'normal' | 'satellite'
 
+/** 高德矢量/影像底图（GCJ-02，与 Web 服务路线坐标一致）。无需 Carto Key。 */
 const BASEMAPS: Record<
   BasemapId,
-  { name: string; url: string; attribution: string; maxZoom: number }
+  { name: string; url: string; attribution: string; maxZoom: number; subdomains: string }
 > = {
-  voyager: {
-    name: 'Voyager',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    maxZoom: 20,
+  normal: {
+    name: '标准',
+    // 高德矢量路网（浅色现代风格）
+    url: 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}',
+    attribution: '&copy; <a href="https://lbs.amap.com/">高德地图</a>',
+    maxZoom: 18,
+    subdomains: '1234',
   },
-  positron: {
-    name: 'Positron',
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    maxZoom: 20,
+  satellite: {
+    name: '影像',
+    url: 'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
+    attribution: '&copy; <a href="https://lbs.amap.com/">高德地图</a>',
+    maxZoom: 18,
+    subdomains: '1234',
   },
 }
 
@@ -146,12 +148,14 @@ export default function MapView({
 }: Props) {
   const [basemap, setBasemap] = useState<BasemapId>(() => {
     try {
-      const saved = localStorage.getItem('bj-rent-basemap') as BasemapId | null
-      if (saved === 'voyager' || saved === 'positron') return saved
+      const saved = localStorage.getItem('bj-rent-basemap')
+      if (saved === 'normal' || saved === 'satellite') return saved
+      // migrate away from retired Carto styles
+      if (saved === 'voyager' || saved === 'positron') return 'normal'
     } catch {
       /* ignore */
     }
-    return 'voyager'
+    return 'normal'
   })
 
   const center = useMemo<[number, number]>(
@@ -184,17 +188,17 @@ export default function MapView({
       <div className="basemap-switch" role="group" aria-label="底图样式">
         <button
           type="button"
-          className={basemap === 'voyager' ? 'active' : ''}
-          onClick={() => setBasemapPersist('voyager')}
+          className={basemap === 'normal' ? 'active' : ''}
+          onClick={() => setBasemapPersist('normal')}
         >
-          Voyager
+          高德标准
         </button>
         <button
           type="button"
-          className={basemap === 'positron' ? 'active' : ''}
-          onClick={() => setBasemapPersist('positron')}
+          className={basemap === 'satellite' ? 'active' : ''}
+          onClick={() => setBasemapPersist('satellite')}
         >
-          Positron
+          高德影像
         </button>
       </div>
 
@@ -210,8 +214,18 @@ export default function MapView({
           attribution={tile.attribution}
           url={tile.url}
           maxZoom={tile.maxZoom}
-          subdomains="abcd"
+          subdomains={tile.subdomains}
         />
+        {basemap === 'satellite' && (
+          <TileLayer
+            key="amap-road-overlay"
+            url="https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}"
+            maxZoom={18}
+            subdomains="1234"
+            opacity={0.9}
+            attribution=""
+          />
+        )}
         <ZoomControlModern />
         <MapChrome />
         <FitBounds company={company} listings={listings} />

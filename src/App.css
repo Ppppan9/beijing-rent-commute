@@ -642,7 +642,7 @@
   }
 }
 
-/* ——— Modern map chrome (Carto Voyager / Positron) ——— */
+/* ——— Modern map chrome (Amap / 高德底图) ——— */
 .map-wrap {
   border-radius: 0;
   overflow: hidden;
