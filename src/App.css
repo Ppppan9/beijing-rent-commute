@@ -654,6 +654,15 @@
   background: #e8eef5;
   font-family: inherit;
 }
+/* HiDPI: keep Gaode raster tiles sharp (512px scl=2 drawn into 256 CSS px) */
+.map-modern .leaflet-tile-container img,
+.map-modern img.leaflet-tile {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: auto;
+  /* avoid fractional CSS sizes causing blur during pan/zoom */
+  max-width: none !important;
+}
+
 
 .map-modern .leaflet-control-attribution {
   background: rgba(255, 255, 255, 0.82) !important;

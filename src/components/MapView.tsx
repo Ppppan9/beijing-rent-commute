@@ -13,26 +13,43 @@ import type { CompanyLocation, CommuteInfo, RentalListing } from '../types'
 
 type BasemapId = 'normal' | 'satellite'
 
-/** 高德矢量/影像底图（GCJ-02，与 Web 服务路线坐标一致）。无需 Carto Key。 */
-const BASEMAPS: Record<
-  BasemapId,
-  { name: string; url: string; attribution: string; maxZoom: number; subdomains: string }
-> = {
-  normal: {
-    name: '标准',
-    // 高德矢量路网（浅色现代风格）
-    url: 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}',
-    attribution: '&copy; <a href="https://lbs.amap.com/">高德地图</a>',
-    maxZoom: 18,
-    subdomains: '1234',
-  },
-  satellite: {
-    name: '影像',
-    url: 'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
-    attribution: '&copy; <a href="https://lbs.amap.com/">高德地图</a>',
-    maxZoom: 18,
-    subdomains: '1234',
-  },
+const AMAP_ATTR = '&copy; <a href="https://lbs.amap.com/">高德地图</a>'
+
+/**
+ * 高德底图（GCJ-02）。
+ * HiDPI：wprd 的 scl=2 返回同级 512×512 瓦片，在 Leaflet tileSize=256 下于 Retina 屏清晰；
+ * 勿再叠加 detectRetina，否则会重复放大请求。
+ */
+function amapNormalUrl(scl: 1 | 2) {
+  return `https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=${scl}&style=7`
+}
+
+function amapSatelliteUrl() {
+  return 'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
+}
+
+function amapRoadOverlayUrl() {
+  return 'https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}'
+}
+
+function useAmapTileScale(): 1 | 2 {
+  const [scl, setScl] = useState<1 | 2>(() =>
+    typeof window !== 'undefined' && (window.devicePixelRatio || 1) >= 1.5 ? 2 : 1,
+  )
+  useEffect(() => {
+    const sync = () => setScl((window.devicePixelRatio || 1) >= 1.5 ? 2 : 1)
+    sync()
+    window.addEventListener('resize', sync)
+    // DPR 变化（外接屏等）
+    const mq = window.matchMedia(`(resolution: 2dppx)`)
+    const onMq = () => sync()
+    mq.addEventListener?.('change', onMq)
+    return () => {
+      window.removeEventListener('resize', sync)
+      mq.removeEventListener?.('change', onMq)
+    }
+  }, [])
+  return scl
 }
 
 function companyIcon() {
@@ -166,7 +183,7 @@ export default function MapView({
     [company],
   )
 
-  const tile = BASEMAPS[basemap]
+  const tileScale = useAmapTileScale()
 
   const setBasemapPersist = (id: BasemapId) => {
     setBasemap(id)
@@ -209,22 +226,47 @@ export default function MapView({
         scrollWheelZoom
         zoomControl={false}
       >
-        <TileLayer
-          key={basemap}
-          attribution={tile.attribution}
-          url={tile.url}
-          maxZoom={tile.maxZoom}
-          subdomains={tile.subdomains}
-        />
-        {basemap === 'satellite' && (
+        {basemap === 'normal' ? (
           <TileLayer
-            key="amap-road-overlay"
-            url="https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}"
+            key={`amap-normal-${tileScale}`}
+            attribution={AMAP_ATTR}
+            url={amapNormalUrl(tileScale)}
             maxZoom={18}
+            maxNativeZoom={18}
+            tileSize={256}
+            zoomOffset={0}
+            detectRetina={false}
             subdomains="1234"
-            opacity={0.9}
-            attribution=""
+            updateWhenIdle
+            keepBuffer={2}
           />
+        ) : (
+          <>
+            <TileLayer
+              key="amap-sat"
+              attribution={AMAP_ATTR}
+              url={amapSatelliteUrl()}
+              maxZoom={18}
+              maxNativeZoom={18}
+              tileSize={256}
+              detectRetina
+              zoomOffset={0}
+              subdomains="1234"
+              updateWhenIdle
+              keepBuffer={2}
+            />
+            <TileLayer
+              key="amap-road-overlay"
+              url={amapRoadOverlayUrl()}
+              maxZoom={18}
+              maxNativeZoom={18}
+              tileSize={256}
+              detectRetina
+              subdomains="1234"
+              opacity={0.95}
+              attribution=""
+            />
+          </>
         )}
         <ZoomControlModern />
         <MapChrome />
