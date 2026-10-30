@@ -7,69 +7,76 @@ import {
   osrmDriving,
 } from './demoGeo'
 
+function toDriving(raw: {
+  durationMin: number
+  distanceKm: number
+  path: [number, number][]
+  summary?: string
+}, from: LatLng, to: LatLng, estimated: boolean): CommuteRoute {
+  return {
+    mode: 'driving',
+    durationMin: raw.durationMin,
+    distanceKm: raw.distanceKm,
+    path: raw.path.length ? raw.path : [[from.lat, from.lng], [to.lat, to.lng]],
+    summary: raw.summary,
+    estimated,
+  }
+}
+
+function toTransit(raw: {
+  durationMin: number
+  distanceKm: number
+  path: [number, number][]
+  summary?: string
+}, from: LatLng, to: LatLng, estimated: boolean): CommuteRoute {
+  return {
+    mode: 'transit',
+    durationMin: raw.durationMin,
+    distanceKm: raw.distanceKm,
+    path: raw.path.length ? raw.path : [[from.lat, from.lng], [to.lat, to.lng]],
+    summary: raw.summary,
+    estimated,
+  }
+}
+
+async function demoCommute(from: LatLng, to: LatLng): Promise<CommuteInfo> {
+  const osrm = await osrmDriving(from, to)
+  const driving = osrm
+    ? toDriving(
+        { ...osrm, summary: 'OSRM 驾车路线（演示）' },
+        from,
+        to,
+        true,
+      )
+    : toDriving(estimateDrivingFallback(from, to), from, to, true)
+
+  return {
+    driving,
+    transit: toTransit(estimateTransit(from, to), from, to, true),
+    preferred: 'transit',
+  }
+}
+
 export async function fetchCommute(from: LatLng, to: LatLng): Promise<CommuteInfo> {
   if (hasAmapKey()) {
     const [drivingRaw, transitRaw] = await Promise.all([
       amapDriving(from, to),
       amapTransit(from, to),
     ])
-    const driving: CommuteRoute | undefined = drivingRaw
-      ? {
-          mode: 'driving',
-          durationMin: drivingRaw.durationMin,
-          distanceKm: drivingRaw.distanceKm,
-          path: drivingRaw.path.length
-            ? drivingRaw.path
-            : ([[from.lat, from.lng], [to.lat, to.lng]] as [number, number][]),
-          summary: drivingRaw.summary,
-          estimated: false,
-        }
-      : undefined
-    const transit: CommuteRoute | undefined = transitRaw
-      ? {
-          mode: 'transit',
-          durationMin: transitRaw.durationMin,
-          distanceKm: transitRaw.distanceKm,
-          path: transitRaw.path.length
-            ? transitRaw.path
-            : ([[from.lat, from.lng], [to.lat, to.lng]] as [number, number][]),
-          summary: transitRaw.summary,
-          estimated: false,
-        }
-      : undefined
 
-    return {
-      driving,
-      transit,
-      preferred: transit ? 'transit' : 'driving',
+    if (drivingRaw || transitRaw) {
+      return {
+        driving: drivingRaw ? toDriving(drivingRaw, from, to, false) : undefined,
+        transit: transitRaw ? toTransit(transitRaw, from, to, false) : undefined,
+        preferred: transitRaw ? 'transit' : 'driving',
+      }
     }
+    // Key present but APIs failed — soft-fallback so UI still shows routes
+    console.warn('[高德] 路线接口无结果，回退演示估算')
+    return demoCommute(from, to)
   }
 
-  const osrm = await osrmDriving(from, to)
-  const drivingEst = osrm
-    ? {
-        mode: 'driving' as const,
-        durationMin: osrm.durationMin,
-        distanceKm: osrm.distanceKm,
-        path: osrm.path,
-        summary: 'OSRM 驾车路线（演示）',
-        estimated: true,
-      }
-    : {
-        mode: 'driving' as const,
-        ...estimateDrivingFallback(from, to),
-      }
-
-  const transitEst = {
-    mode: 'transit' as const,
-    ...estimateTransit(from, to),
-  }
-
-  return {
-    driving: drivingEst,
-    transit: transitEst,
-    preferred: 'transit',
-  }
+  return demoCommute(from, to)
 }
 
 export async function searchPlaces(keywords: string) {
@@ -84,7 +91,9 @@ export async function searchPlaces(keywords: string) {
         seen.add(k)
       }
     }
-    return merged
+    if (merged.length) return merged
+    // Soft fallback if Amap search empty
+    return demoSearch(keywords)
   }
   return demoSearch(keywords)
 }
